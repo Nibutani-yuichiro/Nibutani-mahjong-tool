@@ -14,14 +14,24 @@ export default function App() {
     { id: 3, name: 'Player 3', score: 25000 },
     { id: 4, name: 'Player 4', score: 25000 },
   ]);
-  const [history, setHistory] = useState<Player[][]>(() => {
+  const [history, setHistory] = useState<Record<string, Player[][]>>(() => {
     const savedHistory = localStorage.getItem('mahjong-history');
-    return savedHistory ? JSON.parse(savedHistory) : [];
+    if (savedHistory) {
+      const parsedHistory = JSON.parse(savedHistory);
+      // Check if the saved history is in the old array format
+      if (Array.isArray(parsedHistory)) {
+        const today = new Date().toISOString().slice(0, 10);
+        return { [today]: parsedHistory };
+      }
+      return parsedHistory;
+    }
+    return {};
   });
   const [view, setView] = useState<'main' | 'history'>('main');
   const [isCalculated, setIsCalculated] = useState(false);
   const [tobiSho, setTobiSho] = useState<boolean[]>(players.map(() => false));
   const [scoresBeforeCalc, setScoresBeforeCalc] = useState<Player[] | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
     localStorage.setItem('mahjong-history', JSON.stringify(history));
@@ -110,7 +120,13 @@ export default function App() {
   };
 
   const registerGame = () => {
-    setHistory([...history, players]);
+    const today = new Date().toISOString().slice(0, 10); // Get current date in YYYY-MM-DD format
+    const updatedHistory = { ...history };
+    if (!updatedHistory[today]) {
+      updatedHistory[today] = [];
+    }
+    updatedHistory[today].push(players);
+    setHistory(updatedHistory);
     setPlayers(players.map(p => ({ ...p, score: 25000 })));
     setTobiSho(players.map(() => false));
     setIsCalculated(false);
@@ -127,13 +143,26 @@ export default function App() {
 
   const clearHistory = () => {
     if (window.confirm('Are you sure you want to clear all history?')) {
-      setHistory([]);
+      setHistory({});
       localStorage.removeItem('mahjong-history');
     }
   };
 
   if (view === 'history') {
-    if (history.length === 0) {
+    const allPlayerNamesInHistory = new Set<string>();
+    Object.values(history).forEach(dailyGames => {
+      dailyGames.forEach(game => {
+        game.forEach(player => {
+          allPlayerNamesInHistory.add(player.name);
+        });
+      });
+    });
+    players.forEach(player => {
+      allPlayerNamesInHistory.add(player.name);
+    });
+    const masterPlayerNameList = Array.from(allPlayerNamesInHistory);
+
+    if (Object.keys(history).length === 0) {
       return (
         <div className="App">
           <h1>History</h1>
@@ -144,47 +173,71 @@ export default function App() {
       );
     }
 
-    const allPlayerNamesInHistory = new Set<string>();
-    history.forEach(game => {
-      game.forEach(player => {
-        allPlayerNamesInHistory.add(player.name);
-      });
-    });
-    players.forEach(player => {
-      allPlayerNamesInHistory.add(player.name);
-    });
-    const masterPlayerNameList = Array.from(allPlayerNamesInHistory);
+    const allDates = Object.keys(history).sort(); // All available dates in ascending order
+    const selectedDateIndex = allDates.indexOf(selectedDate);
+    const hasPreviousDay = selectedDateIndex > 0;
+    const hasNextDay = selectedDateIndex < allDates.length - 1;
+
+    const handlePreviousDay = () => {
+      if (hasPreviousDay) {
+        setSelectedDate(allDates[selectedDateIndex - 1]);
+      }
+    };
+
+    const handleNextDay = () => {
+      if (hasNextDay) {
+        setSelectedDate(allDates[selectedDateIndex + 1]);
+      }
+    };
+
+    const gamesForSelectedDate = history[selectedDate] || [];
 
     return (
       <div className="App">
         <h1>History</h1>
         <button onClick={() => setView('main')}>Back to Main</button>
         <button onClick={clearHistory} style={{ marginLeft: '10px' }}>Reset History</button>
-        <table>
-          <thead>
-            <tr>
-              <th>Game</th>
-              {masterPlayerNameList.map((name, idx) => <th key={idx}>{name}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {history.map((game, gameIndex) => (
-              <tr key={gameIndex}>
-                <td>{gameIndex + 1}</td>
-                {masterPlayerNameList.map((name, idx) => {
-                  const playerInGame = game.find(p => p.name === name);
-                  return <td key={idx}>{playerInGame ? playerInGame.score : 'ー'}</td>;
-                })}
+        <div style={{ margin: '20px 0' }}>
+          <button onClick={handlePreviousDay} disabled={!hasPreviousDay}>Previous Day</button>
+          <span style={{ margin: '0 10px', fontSize: '1.2em' }}>{selectedDate}</span>
+          <button onClick={handleNextDay} disabled={!hasNextDay}>Next Day</button>
+        </div>
+
+        {gamesForSelectedDate.length === 0 ? (
+          <p>No games recorded for this date.</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Game</th>
+                {masterPlayerNameList.map((name, idx) => <th key={idx}>{name}</th>)}
               </tr>
-            ))}
-          </tbody>
+            </thead>
+            <tbody>
+              {gamesForSelectedDate.map((game, gameIndex) => (
+                <tr key={gameIndex}>
+                  <td>{gameIndex + 1}</td>
+                  {masterPlayerNameList.map((name, idx) => {
+                    const playerInGame = game.find(p => p.name === name);
+                    return <td key={idx}>{playerInGame ? playerInGame.score : 'ー'}</td>;
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {/* Total row, calculated across ALL games, not just selected date */}
+        <table>
           <tfoot>
             <tr>
               <td>Total</td>
               {masterPlayerNameList.map((name, idx) => {
-                const totalScore = history.reduce((acc, game) => {
-                  const playerInGame = game.find(p => p.name === name);
-                  return acc + (playerInGame ? playerInGame.score : 0);
+                const totalScore = Object.values(history).reduce((acc, dailyGames) => {
+                  return acc + dailyGames.reduce((dayAcc, game) => {
+                    const playerInGame = game.find(p => p.name === name);
+                    return dayAcc + (playerInGame ? playerInGame.score : 0);
+                  }, 0);
                 }, 0);
                 return <td key={idx}>{totalScore}</td>;
               })}
