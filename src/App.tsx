@@ -1,11 +1,7 @@
 import { useEffect, useState } from 'react';
 import './App.css';
-
-type Player = {
-  id: number;
-  name: string;
-  score: number;
-};
+import type { Player, UmaOption } from './types';
+import { calculateFinalScores } from './utils/calculate';
 
 export default function App() {
   const [players, setPlayers] = useState<Player[]>([
@@ -27,11 +23,12 @@ export default function App() {
     }
     return {};
   });
-  const [view, setView] = useState<'main' | 'history'>('main');
+  const [view, setView] = useState<'main' | 'history' | 'help'>('main');
   const [isCalculated, setIsCalculated] = useState(false);
   const [tobiSho, setTobiSho] = useState<boolean[]>(players.map(() => false));
   const [scoresBeforeCalc, setScoresBeforeCalc] = useState<Player[] | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [umaOption, setUmaOption] = useState<UmaOption>('10/30');
 
   useEffect(() => {
     localStorage.setItem('mahjong-history', JSON.stringify(history));
@@ -61,61 +58,14 @@ export default function App() {
     setTobiSho(newTobiSho);
   };
 
-  const calculateFinalScores = () => {
-    const totalScore = players.reduce((sum, player) => sum + player.score, 0);
-    if (totalScore !== 100000) {
-      alert(`The total score must be 100,000, but it is ${totalScore}.`);
+  const handleCalculate = () => {
+    const result = calculateFinalScores(players, tobiSho, umaOption);
+    if (!result.success) {
+      alert(`合計点数が100,000点になるように入力してください（現在: ${result.total}点）`);
       return;
     }
-
-    setScoresBeforeCalc(players.map(p => ({ ...p }))); // Deep copy
-
-    const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
-    const uma = [30, 10, -10, -30];
-    const oka = 20;
-    const negativeScorePlayersCount = players.filter(p => p.score < 0).length;
-
-    const playerUma = new Map<number, number>();
-    let i = 0;
-    while (i < sortedPlayers.length) {
-        let j = i;
-        while (j < sortedPlayers.length && sortedPlayers[j].score === sortedPlayers[i].score) {
-            j++;
-        }
-        const tiedCount = j - i;
-        const umaSlice = uma.slice(i, j);
-        const totalUma = umaSlice.reduce((acc, val) => acc + val, 0);
-        const avgUma = totalUma / tiedCount;
-
-        for (let k = i; k < j; k++) {
-            playerUma.set(sortedPlayers[k].id, avgUma);
-        }
-        i = j;
-    }
-
-    // Oka calculation
-    const topScore = sortedPlayers[0].score;
-    const topPlayers = sortedPlayers.filter(p => p.score === topScore);
-    const okaPerPlayer = oka / topPlayers.length;
-
-
-    const finalScores = players.map((originalPlayer, index) => {
-      let finalScore = (originalPlayer.score - 30000) / 1000;
-      finalScore += playerUma.get(originalPlayer.id)!;
-      if (originalPlayer.score === topScore) {
-          finalScore += okaPerPlayer;
-      }
-
-      if (tobiSho[index]) {
-        finalScore += 10 * negativeScorePlayersCount;
-      }
-      if (originalPlayer.score < 0) {
-        finalScore -= 10;
-      }
-      return { ...originalPlayer, score: finalScore };
-    });
-
-    setPlayers(finalScores);
+    setScoresBeforeCalc(players.map(p => ({ ...p })));
+    setPlayers(result.scores);
     setIsCalculated(true);
   };
 
@@ -147,6 +97,65 @@ export default function App() {
       localStorage.removeItem('mahjong-history');
     }
   };
+
+  if (view === 'help') {
+    return (
+      <div className="App">
+        <h1>使い方</h1>
+        <button onClick={() => setView('main')}>メインに戻る</button>
+        <div className="help-content">
+          <section className="help-section">
+            <h2>1. プレイヤー名の入力</h2>
+            <p>各プレイヤーの名前欄をクリックして名前を入力してください。</p>
+          </section>
+
+          <section className="help-section">
+            <h2>2. 最終点数の入力</h2>
+            <p>
+              ゲーム終了時の点数（持ち点）を入力します。
+              直接数値を入力するか、<strong>-10000 / -1000 / -100 / +100 / +1000 / +10000</strong> のボタンで調整できます。
+            </p>
+            <p className="help-note">4人の点数の合計が <strong>100,000点</strong> になるように入力してください。</p>
+          </section>
+
+          <section className="help-section">
+            <h2>3. 飛び賞</h2>
+            <p>
+              相手の点数をマイナスにする上がりをしたプレイヤー（飛ばした人）の「飛び賞」チェックボックスにチェックを入れてください。
+            </p>
+            <p className="help-note">
+              飛ばしたプレイヤーには <strong>+10点 × 飛んだ人数</strong> が加算されます。
+              また、点数がマイナスになったプレイヤーには自動的に <strong>-10点</strong> のペナルティが付きます。
+            </p>
+          </section>
+
+          <section className="help-section">
+            <h2>4. 最終結果の計算</h2>
+            <p>「最終結果を計算」ボタンを押すと、以下のルールで精算点数を計算します。</p>
+            <ul className="help-list">
+              <li><strong>基準点：</strong> 30,000点</li>
+              <li><strong>ウマ：</strong> 1着 +30 / 2着 +10 / 3着 -10 / 4着 -30</li>
+              <li><strong>オカ：</strong> 全員の基準点超過分（20点）が1着に加算</li>
+              <li><strong>同点時：</strong> 該当順位のウマを平均して分配</li>
+            </ul>
+            <p>計算式：<code>(最終点数 - 30,000) ÷ 1,000 + ウマ + オカ + 飛び賞</code></p>
+          </section>
+
+          <section className="help-section">
+            <h2>5. 修正・登録</h2>
+            <p>計算後に点数を確認し、問題なければ「ゲームを登録」で履歴に保存します。</p>
+            <p>入力ミスがあった場合は「修正」ボタンで入力画面に戻れます。</p>
+          </section>
+
+          <section className="help-section">
+            <h2>6. 履歴</h2>
+            <p>「履歴を見る」ボタンから過去のゲーム結果を確認できます。</p>
+            <p>日付ごとに切り替えて表示でき、全ゲームの累計スコアも確認できます。</p>
+          </section>
+        </div>
+      </div>
+    );
+  }
 
   if (view === 'history') {
     const allPlayerNamesInHistory = new Set<string>();
@@ -252,6 +261,20 @@ export default function App() {
     <div className="App">
       <h1>麻雀点数記録</h1>
       <button onClick={() => setView('history')}>履歴を見る</button>
+      <button onClick={() => setView('help')} style={{ marginLeft: '10px' }}>使い方</button>
+      <div className="uma-selector">
+        <span className="uma-label">ウマ：</span>
+        {(['5/10', '10/20', '10/30'] as UmaOption[]).map((option) => (
+          <button
+            key={option}
+            className={`uma-option${umaOption === option ? ' uma-option--active' : ''}`}
+            onClick={() => setUmaOption(option)}
+            disabled={isCalculated}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
       <table>
         <thead>
           <tr>
@@ -311,7 +334,7 @@ export default function App() {
             </button>
           </>
         ) : (
-          <button onClick={calculateFinalScores}>最終結果を計算</button>
+          <button onClick={handleCalculate}>最終結果を計算</button>
         )}
       </div>
     </div>

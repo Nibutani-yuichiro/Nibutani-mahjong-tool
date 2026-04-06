@@ -119,3 +119,97 @@ tfoot tr {
   font-weight: bold;
 }
 
+/* Uma selector */
+.uma-selector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+
+.uma-label {
+  font-weight: bold;
+  color: #c62828;
+}
+
+.uma-option {
+  background-color: #fff;
+  color: #c62828;
+  border: 2px solid #ef9a9a;
+  padding: 6px 18px;
+  margin: 0;
+  border-radius: 20px;
+  font-size: 0.95rem;
+}
+
+.uma-option:hover:not(:disabled) {
+  background-color: #ffcdd2;
+}
+
+.uma-option--active {
+  background-color: #c62828;
+  color: #fff;
+  border-color: #c62828;
+}
+
+.uma-option--active:hover:not(:disabled) {
+  background-color: #c62828;
+}
+
+.uma-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Help page */
+.help-content {
+  text-align: left;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.help-section {
+  background-color: #fff;
+  border: 1px solid #ef9a9a;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-top: 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.help-section h2 {
+  color: #c62828;
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 1.1rem;
+  border-bottom: 1px solid #ffcdd2;
+  padding-bottom: 8px;
+}
+
+.help-section p {
+  margin: 8px 0;
+  line-height: 1.6;
+}
+
+.help-note {
+  background-color: #fff8f8;
+  border-left: 4px solid #ef9a9a;
+  padding: 8px 12px;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.95rem;
+}
+
+.help-list {
+  margin: 8px 0;
+  padding-left: 24px;
+  line-height: 1.8;
+}
+
+.help-section code {
+  background-color: #ffcdd2;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
