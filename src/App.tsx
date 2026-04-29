@@ -5,10 +5,10 @@ import { calculateFinalScores } from './utils/calculate';
 
 export default function App() {
   const [players, setPlayers] = useState<Player[]>([
-    { id: 1, name: 'Player 1', score: 25000 },
-    { id: 2, name: 'Player 2', score: 25000 },
-    { id: 3, name: 'Player 3', score: 25000 },
-    { id: 4, name: 'Player 4', score: 25000 },
+    { id: 1, name: 'プレイヤー1', score: 25000 },
+    { id: 2, name: 'プレイヤー2', score: 25000 },
+    { id: 3, name: 'プレイヤー3', score: 25000 },
+    { id: 4, name: 'プレイヤー4', score: 25000 },
   ]);
   const [history, setHistory] = useState<Record<string, Player[][]>>(() => {
     const savedHistory = localStorage.getItem('mahjong-history');
@@ -35,21 +35,15 @@ export default function App() {
   }, [history]);
 
   const handleNameChange = (index: number, newName: string) => {
-    const newPlayers = [...players];
-    newPlayers[index].name = newName;
-    setPlayers(newPlayers);
+    setPlayers(players.map((p, i) => i === index ? { ...p, name: newName } : p));
   };
 
   const handleScoreChange = (index: number, newScore: number) => {
-    const newPlayers = [...players];
-    newPlayers[index].score = newScore;
-    setPlayers(newPlayers);
+    setPlayers(players.map((p, i) => i === index ? { ...p, score: newScore } : p));
   };
 
   const updateScore = (index: number, amount: number) => {
-    const newPlayers = [...players];
-    newPlayers[index].score += amount;
-    setPlayers(newPlayers);
+    setPlayers(players.map((p, i) => i === index ? { ...p, score: p.score + amount } : p));
   };
 
   const handleTobiShoChange = (index: number) => {
@@ -92,7 +86,7 @@ export default function App() {
   };
 
   const clearHistory = () => {
-    if (window.confirm('Are you sure you want to clear all history?')) {
+    if (window.confirm('履歴をすべて削除しますか？')) {
       setHistory({});
       localStorage.removeItem('mahjong-history');
     }
@@ -134,7 +128,13 @@ export default function App() {
             <p>「最終結果を計算」ボタンを押すと、以下のルールで精算点数を計算します。</p>
             <ul className="help-list">
               <li><strong>基準点：</strong> 30,000点</li>
-              <li><strong>ウマ：</strong> 1着 +30 / 2着 +10 / 3着 -10 / 4着 -30</li>
+              <li><strong>ウマ：</strong> メイン画面で選択した設定に従って加算
+                <ul className="help-list">
+                  <li>5/10 ― 1着 +10 / 2着 +5 / 3着 -5 / 4着 -10</li>
+                  <li>10/20 ― 1着 +20 / 2着 +10 / 3着 -10 / 4着 -20</li>
+                  <li>10/30 ― 1着 +30 / 2着 +10 / 3着 -10 / 4着 -30</li>
+                </ul>
+              </li>
               <li><strong>オカ：</strong> 全員の基準点超過分（20点）が1着に加算</li>
               <li><strong>同点時：</strong> 該当順位のウマを平均して分配</li>
             </ul>
@@ -174,16 +174,18 @@ export default function App() {
     if (Object.keys(history).length === 0) {
       return (
         <div className="App">
-          <h1>History</h1>
+          <h1>履歴</h1>
           <button onClick={() => setView('main')}>メインに戻る</button>
           <button onClick={clearHistory} style={{ marginLeft: '10px' }}>履歴をリセット</button>
-          <p>No games recorded yet.</p>
+          <p>まだゲームが登録されていません。</p>
         </div>
       );
     }
 
     const allDates = Object.keys(history).sort(); // All available dates in ascending order
-    const selectedDateIndex = allDates.indexOf(selectedDate);
+    // selectedDate が履歴に存在しない場合（例：翌日にアプリを開いた場合）は最新日付にフォールバック
+    const effectiveDate = allDates.includes(selectedDate) ? selectedDate : allDates[allDates.length - 1];
+    const selectedDateIndex = allDates.indexOf(effectiveDate);
     const hasPreviousDay = selectedDateIndex > 0;
     const hasNextDay = selectedDateIndex < allDates.length - 1;
 
@@ -199,48 +201,46 @@ export default function App() {
       }
     };
 
-    const gamesForSelectedDate = history[selectedDate] || [];
+    const gamesForSelectedDate = history[effectiveDate] || [];
 
     return (
       <div className="App">
-        <h1>History</h1>
-        <button onClick={() => setView('main')}>Back to Main</button>
-        <button onClick={clearHistory} style={{ marginLeft: '10px' }}>Reset History</button>
+        <h1>履歴</h1>
+        <button onClick={() => setView('main')}>メインに戻る</button>
+        <button onClick={clearHistory} style={{ marginLeft: '10px' }}>履歴をリセット</button>
         <div style={{ margin: '20px 0' }}>
-          <button onClick={handlePreviousDay} disabled={!hasPreviousDay}>Previous Day</button>
-          <span style={{ margin: '0 10px', fontSize: '1.2em' }}>{selectedDate}</span>
-          <button onClick={handleNextDay} disabled={!hasNextDay}>Next Day</button>
+          <button onClick={handlePreviousDay} disabled={!hasPreviousDay}>前の日</button>
+          <span style={{ margin: '0 10px', fontSize: '1.2em' }}>{effectiveDate}</span>
+          <button onClick={handleNextDay} disabled={!hasNextDay}>次の日</button>
         </div>
 
-        {gamesForSelectedDate.length === 0 ? (
-          <p>No games recorded for this date.</p>
-        ) : (
-          <table>
-            <thead>
+        <table>
+          <thead>
+            <tr>
+              <th>ゲーム</th>
+              {masterPlayerNameList.map((name, idx) => <th key={idx}>{name}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {gamesForSelectedDate.length === 0 ? (
               <tr>
-                <th>Game</th>
-                {masterPlayerNameList.map((name, idx) => <th key={idx}>{name}</th>)}
+                <td colSpan={masterPlayerNameList.length + 1}>この日のゲームはありません。</td>
               </tr>
-            </thead>
-            <tbody>
-              {gamesForSelectedDate.map((game, gameIndex) => (
+            ) : (
+              gamesForSelectedDate.map((game, gameIndex) => (
                 <tr key={gameIndex}>
                   <td>{gameIndex + 1}</td>
                   {masterPlayerNameList.map((name, idx) => {
                     const playerInGame = game.find(p => p.name === name);
-                    return <td key={idx}>{playerInGame ? playerInGame.score : 'ー'}</td>;
+                    return <td key={idx}>{playerInGame ? playerInGame.score.toFixed(1) : 'ー'}</td>;
                   })}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-
-        {/* Total row, calculated for the selected date only */}
-        <table>
+              ))
+            )}
+          </tbody>
           <tfoot>
             <tr>
-              <td>Total</td>
+              <td>合計</td>
               {masterPlayerNameList.map((name, idx) => {
                 const totalScore = gamesForSelectedDate.reduce((acc, game) => {
                   const playerInGame = game.find(p => p.name === name);
@@ -276,8 +276,8 @@ export default function App() {
       <table>
         <thead>
           <tr>
-            <th>Player</th>
-            <th>{isCalculated ? 'Final Score' : 'Final Points'}</th>
+            <th>プレイヤー</th>
+            <th>{isCalculated ? '精算点' : '持ち点'}</th>
             <th>飛び賞</th>
           </tr>
         </thead>
