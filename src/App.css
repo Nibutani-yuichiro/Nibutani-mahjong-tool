@@ -119,6 +119,11 @@ tfoot tr {
   font-weight: bold;
 }
 
+.score-cell {
+  white-space: nowrap;
+  min-width: 60px;
+}
+
 /* Uma selector */
 .uma-selector {
   display: flex;

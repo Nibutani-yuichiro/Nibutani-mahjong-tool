@@ -236,19 +236,17 @@ export default function App() {
           </table>
         )}
 
-        {/* Total row, calculated across ALL games, not just selected date */}
+        {/* Total row, calculated for the selected date only */}
         <table>
           <tfoot>
             <tr>
               <td>Total</td>
               {masterPlayerNameList.map((name, idx) => {
-                const totalScore = Object.values(history).reduce((acc, dailyGames) => {
-                  return acc + dailyGames.reduce((dayAcc, game) => {
-                    const playerInGame = game.find(p => p.name === name);
-                    return dayAcc + (playerInGame ? playerInGame.score : 0);
-                  }, 0);
+                const totalScore = gamesForSelectedDate.reduce((acc, game) => {
+                  const playerInGame = game.find(p => p.name === name);
+                  return acc + (playerInGame ? playerInGame.score : 0);
                 }, 0);
-                return <td key={idx}>{totalScore}</td>;
+                return <td key={idx} className="score-cell">{totalScore.toFixed(1)}</td>;
               })}
             </tr>
           </tfoot>
@@ -296,7 +294,7 @@ export default function App() {
               </td>
               <td>
                 {isCalculated ? (
-                  player.score
+                  player.score.toFixed(1)
                 ) : (
                   <div className="score-input-container">
                     <button onClick={() => updateScore(index, -10000)}>-10000</button>

@@ -53,7 +53,7 @@ export function calculateFinalScores(
     if (player.score < 0) {
       finalScore -= 10;
     }
-    return { ...player, score: finalScore };
+    return { ...player, score: Math.round(finalScore * 10) / 10 };
   });
 
   return { success: true, scores };
